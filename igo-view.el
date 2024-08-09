@@ -206,7 +206,7 @@ height."
                                                      (- grid-margin 0.5)
                                                      (- grid-margin 0.5))))
          ;; Grid
-         (svg-grid (svg-node svg-game-area 'g :class "grid")))
+         (svg-grid (svg-node svg-game-area 'g :class "grid" :fill "black"))
          row-idx col-idx)
     ;; Lines
     (cl-loop for x to (1- w) do
@@ -254,18 +254,18 @@ height."
 
     ;; Stars
     (when (and (= (logand w 1) 1) (= (logand h 1) 1))
-      (svg-circle svg-grid (* grid-interval (/ (1- w) 2.0)) (* grid-interval (/ (1- h) 2.0)) star-radius :fill "black"))
+      (svg-circle svg-grid (* grid-interval (/ (1- w) 2.0)) (* grid-interval (/ (1- h) 2.0)) star-radius))
     (when (and (>= w 13) (>= h 13))
-      (svg-circle svg-grid (* grid-interval 3)       (* grid-interval 3) star-radius :fill "black")
-      (svg-circle svg-grid (* grid-interval (- w 4)) (* grid-interval 3) star-radius :fill "black")
-      (svg-circle svg-grid (* grid-interval 3)       (* grid-interval (- h 4)) star-radius :fill "black")
-      (svg-circle svg-grid (* grid-interval (- w 4)) (* grid-interval (- h 4)) star-radius :fill "black"))
+      (svg-circle svg-grid (* grid-interval 3)       (* grid-interval 3) star-radius)
+      (svg-circle svg-grid (* grid-interval (- w 4)) (* grid-interval 3) star-radius)
+      (svg-circle svg-grid (* grid-interval 3)       (* grid-interval (- h 4)) star-radius)
+      (svg-circle svg-grid (* grid-interval (- w 4)) (* grid-interval (- h 4)) star-radius))
     (when (and (>= w 19) (>= h 19) (= (logand w 1) 1))
-      (svg-circle svg-grid (* grid-interval (/ (1- w) 2.0)) (* grid-interval 3) star-radius :fill "black")
-      (svg-circle svg-grid (* grid-interval (/ (1- w) 2.0)) (* grid-interval (- h 4)) star-radius :fill "black"))
+      (svg-circle svg-grid (* grid-interval (/ (1- w) 2.0)) (* grid-interval 3) star-radius)
+      (svg-circle svg-grid (* grid-interval (/ (1- w) 2.0)) (* grid-interval (- h 4)) star-radius))
     (when (and (>= w 19) (>= h 19) (= (logand h 1) 1))
-      (svg-circle svg-grid (* grid-interval 3)       (* grid-interval (/ (1- h) 2.0)) star-radius :fill "black")
-      (svg-circle svg-grid (* grid-interval (- w 4)) (* grid-interval (/ (1- h) 2.0)) star-radius :fill "black"))
+      (svg-circle svg-grid (* grid-interval 3)       (* grid-interval (/ (1- h) 2.0)) star-radius)
+      (svg-circle svg-grid (* grid-interval (- w 4)) (* grid-interval (/ (1- h) 2.0)) star-radius))
     ;; Layers
     (svg-node svg-game-area 'g :class "shadows")
     (svg-node svg-game-area 'g :class "stones")
