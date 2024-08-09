@@ -2162,8 +2162,8 @@ turn(igo-game-turn) if illegal move is allowed."
       (let* ((board (igo-editor-board editor))
              (default-w (if board (igo-board-w board) igo-board-default-w))
              (default-h (if board (igo-board-h board) igo-board-default-h))
-             (w (read-number "Board Width(1-52): " default-w))
-             (h (read-number "Board Height(1-52): " default-h))
+             (w (read-number "Board Width(1-19): " default-w))
+             (h (read-number "Board Height(1-19): " default-h))
              (new-game (igo-game w h)))
 
         ;; Update buffer text
