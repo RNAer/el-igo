@@ -289,6 +289,7 @@
     (define-key km (kbd "s n") #'igo-editor-toggle-move-number)
     (define-key km (kbd "s b") #'igo-editor-toggle-branch-text)
     ;; edit
+    (define-key km "k" #'igo-editor-cut-current-node)
     (define-key km "c" #'igo-editor-edit-comment)
     (define-key km "N" #'igo-editor-edit-move-number)
     (define-key km "g" #'igo-editor-edit-game-info)
