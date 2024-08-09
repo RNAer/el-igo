@@ -207,8 +207,20 @@ height."
                                                      (- grid-margin 0.5))))
          ;; Grid
          (svg-grid (svg-node svg-game-area 'g :class "grid")))
+         row-idx col-idx)
     ;; Lines
     (cl-loop for x to (1- w) do
+             ;; column index
+             (setq col-idx (substring "ABCDEFGHJKLMNOPQRST" x (1+ x)))
+             (svg-text svg-grid col-idx
+                       :x (* grid-interval x)
+                       :y (- grid-interval)
+                       :dominant-baseline "hanging"
+                       :text-anchor "middle")
+             (svg-text svg-grid col-idx
+                       :x (* grid-interval x)
+                       :y (* grid-interval h)
+                       :text-anchor "middle")
              (svg-line svg-grid
                        (* x grid-interval)
                        (/ line-w -2.0)
@@ -216,12 +228,30 @@ height."
                        (+ (* (1- h) grid-interval) (/ line-w 2.0))
                        :stroke "black" :stroke-width line-w))
     (cl-loop for y to (1- h) do
+             ;; row index
+             (setq row-idx (number-to-string (- h y)))
+             (svg-text svg-grid row-idx
+                       :x (- grid-interval)
+                       :y (* grid-interval y)
+                       :text-anchor "end"
+                       :dominant-baseline "middle")
+             ;; :fill "black"
+             ;; :font-size "10"
+             ;; :font-family igo-svg-font-family
+             ;; :font-weight igo-svg-font-weight)
+             (svg-text svg-grid row-idx
+                       :x (* grid-interval w)
+                       :y (* grid-interval y)
+                       :text-anchor "start"
+                       :dominant-baseline "middle")
+
              (svg-line svg-grid
                        (/ line-w -2.0)
                        (* y grid-interval)
                        (+ (* (1- w) grid-interval) (/ line-w 2.0))
                        (* y grid-interval)
                        :stroke "black" :stroke-width line-w))
+
     ;; Stars
     (when (and (= (logand w 1) 1) (= (logand h 1) 1))
       (svg-circle svg-grid (* grid-interval (/ (1- w) 2.0)) (* grid-interval (/ (1- h) 2.0)) star-radius :fill "black"))
