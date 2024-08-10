@@ -1,42 +1,43 @@
-#+TITLE: el-igo - Emacs Go Game(SGF) Editor
+#+TITLE: el-igo - Emacs Go Game (SGF) Editor
 #+OPTIONS: toc:nil num:nil ^:nil
 
-Emacs内で囲碁の盤面を表示し、棋譜(SGF形式)を編集します。
+It displays the Go board and edits the game record (SGF format) in Emacs.
 
-[[file:./screenshot/igo-org-20201227.gif]]
+* Emacs Environment
+- Emacs 27.1-30.06
+- Org-mode 9.7.5
 
-* 動作環境
-Emacs 27.1
+* use it in org-mode (igo-org.el)
+** setup
+1. Put code inside init path. Then:
+   #+begin_src emacs-lisp
+   (with-eval-after-load "org"
+     (require 'igo-org)
+     (igo-org-setup))
+   #+end_src
+2. Use ~use-package~
+   #+begin_src emacs-lisp
+     (use-package igo-org
+         :after org
+         :vc (:url https://github.com/rnaer/el-igo)
+         :config
+         (igo-org-setup))
+   #+end_src
 
-* org-mode文書内に棋譜を埋め込む(igo-org.el)
-** 設定
-init.elに次のコードを追加してください。
-
-#+begin_src emacs-lisp
-(with-eval-after-load "org"
-  (require 'igo-org)
-  (igo-org-setup))
-#+end_src
-
-また、HTMLとしてエクスポートしたときに盤面を表示したい場合は[[#org-export][後述]]の設定も追加してください。
-
-** 使い方
-org文書内にigo特殊ブロックを挿入します。(操作例: C-c C-, SPC i g o RET)
+** usage
+Insert igo special block in a org-mode file:
 
 #+begin_src org
 ,#+begin_igo
 ,#+end_igo
 #+end_src
 
-ブロックの中に (;SZ[9]) と入力すると9路盤が表示されます。またはブロック内で C-c i を押すと盤面サイズを指定して初期化できるようになっています。
+Inside the block, you can create or edit SGF file for a Go game.
+** igo block options
 
-後は適当に石を置いたり、フリー編集モードで初期盤面を設定したり、コメントを設定したりすると、その操作毎にバッファのテキストが書き換わります。
+special header args can be used following =#+begin_igo=.
 
-** ブロック毎のオプション
-
-=#+begin_igo= の後にブロック毎のオプションを指定できます。
-
-例えば次のようにするとブロックが盤面化されたとき(orgファイルを開いたとき等)に最初から手順番号が表示されます。
+For example,  the following will display the step number on the stones when the block is boarded (e.g., when the org file is opened).
 
 #+begin_src org
 ,#+begin_igo :move-number t
@@ -44,242 +45,242 @@ org文書内にigo特殊ブロックを挿入します。(操作例: C-c C-, SPC
 ,#+end_igo
 #+end_src
 
-有効なオプションには次のものがあります。
+Valid options include:
 
-| オプション名   | 意味                        | 値                                                            |
-|----------------+-----------------------------+---------------------------------------------------------------|
-| :status-bar    | ステータスバーの表示状態    | nil, noのとき非表示                                           |
-| :move-number   | 手順番号の表示状態          | nil, noのとき非表示                                           |
-| :branch-text   | 分岐文字(A,B,...)の表示状態 | nil, noのとき非表示                                           |
-| :editable      | 編集可能                    | nil, noのとき編集不可能                                       |
-| :read-only     | 編集禁止(:editableの逆)     | nil, noのとき編集可能                                         |
-| :path          | 最初に表示する盤面(ノード)  | 盤面へたどり着く経路(後述)                                    |
-| :display       | エクスポート時の表示方法    | 表示方法を示す値([[#org-export-options][後述]])                                        |
-| :grid-interval | 格子線の間隔                | ピクセル数(デフォルトは igo-board-view-grid-interval-default) |
+| header args    | meaning                                    | value                                                              |
+|----------------+--------------------------------------------+--------------------------------------------------------------------|
+| :status-bar    | Status bar display state                   | Hidden when nil or no                                              |
+| :move-number   | Display state of step number               | Hidden when nil or no                                              |
+| :branch-text   | Display state of branch text (A, B, ...)   | Hidden when nil or no                                              |
+| :editable      | Editable                                   | Not editable if nil or no                                          |
+| :read-only     | Editing prohibited (opposite of :editable) | Editing possible when nil or no                                    |
+| :path          | The board (node) to display initially      | The path to reach the board (see below)                            |
+| :display       | Display method when exporting              | Value indicating the display method ([[#org-export-options][see below]])                    |
+| :grid-interval | Grid interval                              | Number of pixels (default is igo-board-view-grid-interval-default) |
 
-orgファイル内に ~#+IGO_BLOCK_DEFAULTS:~ を記述することで、ファイル内でのオプションのデフォルト値を設定できます。(注意:現在の所、変更時はファイルを開き直す必要があります)
+Or you can set the default value of an option in the file by writing in the file. (Note: Currently, you need to reopen the file when you change it.)
 
-例:
+Example:
+
 #+begin_src org
 ,#+IGO_BLOCK_DEFAULTS: :grid-interval 24 :move-number t
 #+end_src
 
-*** :pathの指定方法
+*** How to specify =:path=
 
-:path オプションは最初に表示する盤面(ゲーム木のノード)を指定します。
+The :path option specifies the initial board (game tree node) to display.
 
-パス(盤面へたどり着く経路)は次の要素を並べたもので、最初の盤面(ルート)から各要素が指定する盤面を順番にたどり最終的に到達した盤面が選択されます。
+A path (a route to a board state) is a sequence of the following elements, and the final board state is selected by tracing the board states specified by each element in order from the initial board state (route).
 
-| 数字                       | 現在の盤面から数字で指定しただけ後の盤面(途中分岐がある場合は最初の分岐(A)を選択)(無い場合は最後の盤面) |
-| -数字                      | 現在の盤面から数字で指定しただけ前の盤面(無い場合は最初の盤面)                                          |
-| アルファベット二文字       | SGF座標とみなし、その場所に打つ現在の盤面から最も近い盤面(幅優先探索)                                   |
-| 大文字アルファベット一文字 | 現在の盤面以降の最初の分岐での分岐先(A:0, B:1, ...)を指定したものと見なし、その分岐直後の盤面           |
-| \under{} (アンダーバー)    | 現在の盤面以降の最初の分岐がある盤面(分岐が無ければ最後の盤面)                                          |
+| Number                         | The state after the current state specified by the number (if there are intermediate branches, select the first branch (A)) (if there are no intermediate branches, select the final state) |
+| -number                        | The previous board state specified by the number from the current board state (if not specified, the first board state)                                                                     |
+| Two letters of the alphabet    | Consider it as SGF coordinates, and place it at that location. The board state closest to the current board state (breadth-first search)                                                    |
+| One capital alphabet character | The first branch destination (A:0, B:1, ...) after the current board state is specified, and the board state immediately after that branch                                                  |
+| \under{} (underscore)          | The first board state with a branch after the current board state (the last board state if there are no branches)                                                                           |
 
-例:
-- 0 : 最初の盤面
-- 12 : 最初から12手目の盤面
-- cd : 最初に3の4に着手する盤面
-- cc/fc : 最初に左上三々(cc)に着手した後、次に最初に二間開き(fc)した盤面
-- cc/2 : 最初に着手した後の2手目
-- A/B/A : 分岐をA、B、Aの順に選択した盤面
-- _ : 最初の分岐(無ければ最後の盤面)
-- _/-1 : 最初の分岐(無ければ最後の盤面)の一つ前
+example:
+- 0 : First board
+- 12: The 12th move from the beginning
+- cd : First move to 3 of 4
+- cc/fc: The first move to the upper left triple (cc), followed by the first move to the two spaces (fc)
+- cc/2 : 2nd move after the first move
+- A/B/A: The board with the branches selected in the order A, B, A.
+- _ : First branch (if not, the final board state)
+- _/-1: One before the first branch (if there is none, the final board state)
 
-* SGFファイルの編集(igo-sgf-mode.el)
-** 設定
-init.elに次のコードを追加してください。
+* Edit SGF file with ~igo-sgf-mode.el~
+Add the following code to your emacs config:
 
 #+begin_src emacs-lisp
 (autoload 'igo-sgf-mode "igo-sgf-mode")
 (add-to-list 'auto-mode-alist '("\\.sgf$" . igo-sgf-mode))
 #+end_src
 
-sgfファイルを開くと自動的に盤面が表示されます。
+When you open an SGF file, the board will automatically be displayed.
 
-注意: sgfファイルはオセロ、チェス、バックギャモンなど囲碁以外のゲームの棋譜も表現できます。あなたがそれらを扱う場合は、GMプロパティが1以外のときにigo-sgf-modeを起動しないようにする必要があります(未実装)。
+Note: SGF files can also represent other games besides Go, such as Othello, chess, backgammon, etc. If you handle them, you need to make sure that ~igo-sgf-mode~ is not started when the GM property is not 1 (not yet implemented).
 
-* バッファ内の任意の部分を盤面にする(igo-editor.el)
+* Make any part of the buffer the game board with ~igo-editor.el~
 
-任意のSGFテキストをリージョンで囲った上で M-x igo-edit-region を実行すると、その範囲がエディタ化されます。
+If you enclose any SGF text in a region and then run M-x igo-edit-region, that region will become an editor.
 
-igo-sgf-mode.el も igo-org.el も igo-editor.el を使って実装されています。igo-sgf-mode.elはバッファ全体を、igo-org.elはbegin_igo～end_igoの間を自動的にエディタ化します。
+Both ~igo-sgf-mode.el~ and ~igo-org.el~ are implemented using ~igo-editor.el~. ~igo-sgf-mode.el~ automatically converts the entire buffer into an editor, while ~igo-org.el~ automatically converts the region between =#+begin_igo= and =#+end_igo= into an editor.
 
-* エディタの使い方
-** モード
-エディタは大きく分けて次のようなモードを持っています。
+* How to use the editor
+** Mode
+The editor has the following main modes:
 
-- テキストモード
-  - 固定モード(エラーが無くなってもテキストのまま)
-  - 自動回復モード(エラーが無くなったときに自動的にグラフィカルモードに移行する)
-** キー操作
-各モードで使えるキー操作は次の通りです。
+- Text mode
+- Fixed mode (remains text even if the error is gone)
+- Auto-recovery mode (automatically switches to graphical mode when no errors are detected)
 
-*** テキストモード
+** Key bindings
 
-| 操作  | 説明                     | 関数                      |
-|-------+--------------------------+---------------------------|
-| C-c q | エディタの終了           | igo-editor-quit           |
-| C-c g | グラフィカルモードへ移行 | igo-editor-graphical-mode |
-| C-c i | 盤面の初期化             | igo-editor-init-board     |
+*** Text mode
 
-*** グラフィカルモード共通
+| Operation | Description              | Function                  |
+|-----------+--------------------------+---------------------------|
+| C-c q     | Quit editor              | igo-editor-quit           |
+| C-c g     | Switch to graphical mode | igo-editor-graphical-mode |
+| C-c i     | Initialize board         | igo-editor-init-board     |
 
-| 操作                      | 説明                                   | 関数                          |
-|---------------------------+----------------------------------------+-------------------------------|
-| C-c g                     | テキストモードへ移行                   | igo-editor-text-mode          |
-| C-x c-q                   | 編集可能状態切り替え                   | igo-editor-toggle-editable    |
-|---------------------------+----------------------------------------+-------------------------------|
-| a, \vert{}<ボタンクリック | 最初へ                                 | igo-editor-first-node         |
-| e, >\vert{}ボタンクリック | 最後へ(デフォルト選択でたどれる所まで) | igo-editor-last-node          |
-| b, <ボタンクリック        | 前へ                                   | igo-editor-previous-node      |
-| f, >ボタンクリック        | 次へ(デフォルト選択でたどれる場合)     | igo-editor-next-node          |
-| M-b                       | 前の分岐地点へ                         | igo-editor-previous-fork      |
-| M-f                       | 次の分岐地点へ                         | igo-editor-next-fork          |
-| n                         | 次の盤面を分岐の中から選択して表示     | igo-editor-select-next-node   |
-|---------------------------+----------------------------------------+-------------------------------|
-| Q                         | 着手モード                             | igo-editor-move-mode          |
-| F                         | フリー編集モード                       | igo-editor-free-edit-mode     |
-| M                         | マーク編集モード                       | igo-editor-mark-edit-mode     |
-|---------------------------+----------------------------------------+-------------------------------|
-| s s                       | ステータスバー表示切り替え             | igo-editor-toggle-status-bar  |
-| s n                       | 手順番号表示切り替え                   | igo-editor-toggle-move-number |
-| s b                       | 分岐表示切り替え                       | igo-editor-toggle-branch-text |
-|---------------------------+----------------------------------------+-------------------------------|
-| c                         | コメントの編集                         | igo-editor-edit-comment       |
-| N                         | 手順番号の編集                         | igo-editor-edit-move-number   |
-| g                         | 対局情報の編集                         | igo-editor-edit-game-info     |
-|---------------------------+----------------------------------------+-------------------------------|
-| x                         | 盤面のSVG画像出力                      | igo-editor-export-image       |
-|---------------------------+----------------------------------------+-------------------------------|
-| C-c i                     | 盤面の初期化                           | igo-editor-init-board         |
+*** Common to all graphical modes
 
-*** 着手モード
+| Operation                | Description                                                    | Function                      |
+|--------------------------+----------------------------------------------------------------+-------------------------------|
+| C-c g                    | Go to text mode                                                | igo-editor-text-mode          |
+| C-x c-q                  | Toggle editable state                                          | igo-editor-toggle-editable    |
+|--------------------------+----------------------------------------------------------------+-------------------------------|
+| a, \vert{}< button click | Go to the beginning                                            | igo-editor-first-node         |
+| e, >\vert{} button click | Go to the end (as far as you can reach with default selection) | igo-editor-last-node          |
+| b, < button click        | Previous                                                       | igo-editor-previous-node      |
+| f, > button click        | Next (if default selection is available)                       | igo-editor-next-node          |
+| M-b                      | Previous fork                                                  | igo-editor-previous-fork      |
+| M-f                      | Next fork                                                      | igo-editor-next-fork          |
+| n                        | Select the next board state from the branch and display it     | igo-editor-select-next-node   |
+|--------------------------+----------------------------------------------------------------+-------------------------------|
+| Q                        | Move mode                                                      | igo-editor-move-mode          |
+| F                        | Free edit mode                                                 | igo-editor-free-edit-mode     |
+| M                        | Mark edit mode                                                 | igo-editor-mark-edit-mode     |
+|--------------------------+----------------------------------------------------------------+-------------------------------|
+| s s                      | Toggle status bar display                                      | igo-editor-toggle-status-bar  |
+| s n                      | Toggle step number display                                     | igo-editor-toggle-move-number |
+| s b                      | Toggle the display of next move                                | igo-editor-toggle-branch-text |
+|--------------------------+----------------------------------------------------------------+-------------------------------|
+| c                        | Edit comment                                                   | igo-editor-edit-comment       |
+| N                        | Edit step number                                               | igo-editor-edit-move-number   |
+| g                        | Edit game info                                                 | igo-editor-edit-game-info     |
+|--------------------------+----------------------------------------------------------------+-------------------------------|
+| x i                      | SVG image output of the board surface                          | igo-editor-export-image       |
+|--------------------------+----------------------------------------------------------------+-------------------------------|
+| C-c i                    | Initialize board                                               | igo-editor-init-board         |
 
-| 操作                  | 説明                                 | 関数                               |
-|-----------------------+--------------------------------------+------------------------------------|
-| P, Passボタンクリック | パス                                 | igo-editor-pass                    |
-| p                     | 石を置く                             | igo-editor-put-stone               |
-| 盤面をクリック        | 石を置く                             | igo-editor-move-mode-board-click   |
-| Passボタン右クリック  | 着手「パス」に対するメニューを表示   | igo-editor-pass-click-r            |
-| 盤面を右クリック      | 交点(石や空点)に対するメニューを表示 | igo-editor-move-mode-board-click-r |
-| \dollar               | 現在の盤面をルートにする             | igo-editor-make-current-node-root  |
+**** Move Mode
 
-*** フリー編集モード
+| Operation                  | Description                                              | Function                           |
+|----------------------------+----------------------------------------------------------+------------------------------------|
+| P, click Pass button       | Pass                                                     | igo-editor-pass                    |
+| p                          | put stone                                                | igo-editor-put-stone               |
+| Click on the board         | Place a stone                                            | igo-editor-move-mode-board-click   |
+| Right click on Pass button | Display menu for "Pass"                                  | igo-editor-pass-click-r            |
+| Right-click on the board   | Display menu for intersections (stones and empty points) | igo-editor-move-mode-board-click-r |
+| \dollar                    | Make current node root                                   | igo-editor-make-current-node-root  |
 
-(現在の所、一番最初の盤面でのみ使用できます)
+**** Free edit mode
 
-| 操作                   | 説明                     | 関数                             |
-|------------------------+--------------------------+----------------------------------|
-| Quitボタンクリック     | 着手モードへ切り替え     | igo-editor-move-mode             |
-| p                      | 交点を選択中の状態にする | igo-editor-free-edit-put         |
-| 盤面をクリック         | 交点を選択中の状態にする | igo-editor-free-edit-board-down |
-| B, Blackボタンクリック | 黒石を選択する           | igo-editor-free-edit-black       |
-| W, Whiteボタンクリック | 白石を選択する           | igo-editor-free-edit-white       |
-| E, Emptyボタンクリック | 空点を選択する           | igo-editor-free-edit-empty       |
-| T, Turnボタンクリック  | 次の手番を反転させる     | igo-editor-free-edit-toggle-turn |
+(Currently, it can only be used on the first board)
 
-*** マーク編集モード
+| Operation             | Description                              | Function                         |
+|-----------------------+------------------------------------------+----------------------------------|
+| Click Quit button     | Switch to move mode                      | igo-editor-move-mode             |
+| p                     | Set intersection point to selected state | igo-editor-free-edit-put         |
+| Click on the board    | Select the intersection                  | igo-editor-free-edit-board-down  |
+| B, Click Black button | Select black stone                       | igo-editor-free-edit-black       |
+| W, White button click | Select white stone                       | igo-editor-free-edit-white       |
+| E, Click Empty button | Select empty point                       | igo-editor-free-edit-empty       |
+| T, Click Turn button  | Reverse next turn                        | igo-editor-free-edit-toggle-turn |
 
-| 操作                  | 説明                     | 関数                             |
-|-----------------------+--------------------------+----------------------------------|
-| Quitボタンクリック    | 着手モードへ切り替え     | igo-editor-move-mode             |
-| p                     | 交点を選択中の状態にする | igo-editor-mark-edit-put         |
-| 盤面をクリック        | 交点を選択中の状態にする | igo-editor-mark-edit-board-down |
-| X, Xボタンクリック    | ×マークを選択する       | igo-editor-mark-edit-cross       |
-| O, Oボタンクリック    | ○マークを選択する       | igo-editor-mark-edit-circle      |
-| S, SQボタンクリック   | □マークを選択する       | igo-editor-mark-edit-square      |
-| T, TRボタンクリック   | △マークを選択する       | igo-editor-mark-edit-triangle    |
-| E, Textボタンクリック | テキストを選択する       | igo-editor-mark-edit-text        |
-| D, Delボタンクリック  | 消去を選択する           | igo-editor-mark-edit-del         |
+**** Mark Edit Mode
 
-** 分岐の編集
+| Operation            | Description                        | Function                        |
+|----------------------+------------------------------------+---------------------------------|
+| Click Quit button    | Switch to move mode                | igo-editor-move-mode            |
+| p                    | Set intersection point as selected | igo-editor-mark-edit-put        |
+| Click on the board   | Mark the intersection as selected  | igo-editor-mark-edit-board-down |
+| X, X button click    | Select with ╳ mark                | igo-editor-mark-edit-cross      |
+| Click O, O button    | Select with ○ mark                | igo-editor-mark-edit-circle     |
+| Click S, SQ button   | Select with □ mark                | igo-editor-mark-edit-square     |
+| Click T, TR button   | Select with △ mark                | igo-editor-mark-edit-triangle   |
+| E, Click Text button | Select with text                   | igo-editor-mark-edit-text       |
+| D, click Del button  | Delete the select node             | igo-editor-mark-edit-del        |
 
-前の手に戻って別の場所に打つと自動的に分岐が作られます。エディタは全ての分岐をツリー構造で記録しています。
+** Editing a branch
 
-分岐は分岐直前の盤面でAから始まるアルファベットで表示されます。
+If you go back and hit a different place, a branch will be created automatically. The editor keeps track of all the branches in a tree structure.
 
-分岐箇所を示すアルファベットを「左クリック」すると、その分岐に進みます。
+Branches are displayed with an alphabet starting with A on the board just before the branch.
 
-「次へ進む」ボタンは最後に選んだ分岐へ進みますが、もしまだ選択していない場合は明示的に指定する必要があります。
+Left-click on the alphabet that indicates a branching point to proceed to that branch.
 
-分岐を削除したい場合や分岐の(アルファベットの)順番を変更したい場合は、アルファベットを *「右クリック」* してください。分岐に対する操作がポップアップメニューで表示されます。
+The "Next" button will proceed to the last selected branch, but you must explicitly select it if it is not already selected.
 
-* org-modeでHTMLエクスポートする
-  :PROPERTIES:
-  :CUSTOM_ID: org-export
-  :END:
+If you want to delete a branch or change the (alphabetical) order of the branches, *right-click* on the alphabet. A pop-up menu will appear with options for what to do with the branch.
 
-org-mode文書中に棋譜を埋め込んだのならエクスポート後の文書にも盤面が表示されて欲しいと思うことでしょう。ここではHTMLでのエクスポート時に盤面を出力する方法について説明します。
+* Export HTML in org-mode
+PROPERTIES:
+:CUSTOM_ID: org-export
+:END:
 
-** org-mode標準機能だけで処理する方法
-標準のHTMLバックエンドは特殊ブロックをdivタグで囲んだ形で出力します。 ~#+begin_igo~ ～ ~#+end_igo~ も特殊ブロックなので、HTMLで出力すると ~<div class="igo"><p>~ /SGFテキスト/ ~</p></div>~ の形で出力されます。
+If you have embedded a game record in an org-mode document, you will probably want the game board to be displayed in the exported document. Here we explain how to output the game board when exporting to HTML.
 
-盤面の形で表示させたい場合は、ページ読み込み完了時にJavaScriptで一括変換すると良いでしょう。
+** How to process using only standard org-mode functions
+The standard HTML backend outputs special blocks enclosed in div tags. Since ~#+begin_igo~ to ~#+end_igo~ are also special blocks, when output in HTML they are output in the form ~<div class="igo"><p>~ /SGF text/ ~</p></div>~.
 
-例えば拙作のJavaScript碁盤を使用するならば [[https://github.com/misohena/js_igo][misohena/js_igo: JavaScript Go Game Board]] より igo.js, igo_view.js, igo.css をダウンロードした上で、次のようにします。
+If you want to display it in the shape of a board, it is a good idea to convert it all at once using JavaScript when the page has finished loading.
+
+For example, if you want to use my JavaScript Go board, download igo.js, igo_view.js, and igo.css from [[https://github.com/misohena/js_igo][misohena/js_igo: JavaScript Go Game Board]] and do the following.
 
 #+begin_src org
 ,#+HTML_HEAD: <script src="igo.js"></script>
 ,#+HTML_HEAD: <script src="igo_view.js"></script>
 ,#+HTML_HEAD: <link rel="stylesheet" href="igo.css" />
-,#+HTML_HEAD: <script>window.addEventListener("load", ev=>{ for(elem of document.querySelectorAll("div.igo")){ let sgf = elem.textContent; while(elem.hasChildNodes()){elem.removeChild(elem.firstChild);} new igo.GameView(elem, sgf, {"showBranchText": true, "showLastMoveMark": true, "showComment": true, "path":1000}); }});</script>
+,#+HTML_HEAD: <script>window.addEventListener("load", ev=>{ for(elem of document.querySelectorAll("div.igo")){ let sgf = elem.textContent; while(elem.hasChildNodes() ){elem.removeChild(elem.firstChild);} new igo.GameView(elem, sgf, {"showBranchText": true, "showLastMoveMark": true, "showComment": true, "path":1000}); }} );</script>
 
-お互いに二連星したところ。
+They just got two stars from each other.
 
 ,#+begin_igo
 (;FF[4]GM[1]SZ[9];B[fd];W[df];B[ff];W[dd])
 ,#+end_igo
 #+end_src
 
-** エクスポータをカスタマイズする
+** Customizing the exporter
 
-igo特殊ブロックの出力(変換結果)自体を変える方法もあります。
+There is also a way to change the output (conversion result) of the igo special block itself.
 
-igo特殊ブロックの出力を変えるためにはorg-modeのエクスポータをカスタマイズしなければなりませんが、その方法として次の三つを用意しました。
+To change the output of igo special blocks, you need to customize the org-mode exporter. There are three ways to do this:
 
-- 既存のHTMLバックエンドを修正する
-- HTMLバックエンドから派生した新しいバックエンドを定義する
-- バッファローカル変数を書き替える
+- Modify an existing HTML backend
+- Define a new backend that is derived from the HTML backend
+- Overwrite buffer local variables
 
-** 既存のHTMLバックエンドを修正する
+** Modifying an existing HTML backend
 
-最も使い勝手の良い方法は既存のHTMLバックエンドを修正することです。一度設定してしまえばファイル毎に設定する必要はありませんし、普段通りの操作でエクスポートできます。
+The easiest way to do this is to modify an existing HTML backend, so once you've set it up you don't have to configure it for each file, and you can export as you normally would.
 
-次のコードを init.el に追加してください。
+Add the following code to your emacs config:
 
 #+begin_src emacs-lisp
-(with-eval-after-load "ox-html"
+  (with-eval-after-load "ox-html"
+    (require 'igo-org-export-html)
+    (igo-org-modify-html-backend))
+#+end_src
+
+Then, immediately after the org-mode HTML backend is loaded, it is rewritten to handle the igo special blocks (the =#+begin_igo= to =#+end_igo= parts) specially.
+
+By default, it outputs HTML that uses my own JavaScript Go board, so download igo.js, igo_view.js, and igo.css from [[https://github.com/misohena/js_igo][misohena/js_igo: JavaScript Go Game Board]] and place them in the same location as the html.
+
+Now just export it as HTML as you normally would.
+
+** Define a new backend that derives from the HTML backend
+
+If for some reason you don't want to modify the HTML backend directly, you can define a new custom backend.
+
+The following code will register a backend named igo-html.
+
+#+begin_src emacs-lisp
   (require 'igo-org-export-html)
-  (igo-org-modify-html-backend))
+  (igo-org-define-html-backend t)
 #+end_src
 
-すると org-mode のHTMLバックエンドが読み込まれた直後にそれを書き替えてigo特殊ブロック( ~#+begin_igo~ ～ ~#+end_igo~ 部分)を特別に処理するようにします。
+Specifying ~t~ as an argument to ~igo-org-define-html-backend~ will add an item to the menu.
 
-デフォルトは拙作のJavaScript碁盤を使うHTMLを出力するので、 [[https://github.com/misohena/js_igo][misohena/js_igo: JavaScript Go Game Board]] より igo.js, igo_view.js, igo.css をダウンロードしてhtmlと同じ場所に配置してください。
+After bringing up the export menu with =Cc Ce=, you can specify this backend by pressing g.
 
-あとは通常通りHTMLとしてエクスポートするだけです。
+** Setting filters for individual files
 
-** HTMLバックエンドから派生した新しいバックエンドを定義する
+You can change the conversion process by setting buffer-local variables for each file without customizing the backend.
 
-何らかの理由でHTMLバックエンドを直接修正して欲しくない場合、新しく専用のバックエンドを定義することも出来ます。
-
-次のコードを実行すると igo-html という名前のバックエンドが登録されます。
-
-#+begin_src emacs-lisp
-(require 'igo-org-export-html)
-(igo-org-define-html-backend t)
-#+end_src
-
-~igo-org-define-html-backend~ の引数に ~t~ を指定するとメニューに項目を追加します。
-
-=C-c C-e= でエクスポートのメニューを出した後、 g を押すことでこのバックエンドを指定できます。
-
-** 個別のファイルにフィルタを設定する
-
-バックエンドをカスタマイズしなくても、ファイルごとにバッファローカル変数を設定することで変換処理を変更できます。
-
-この方法を使うには、org-mode文書の中に次のコードを追加してください。
+To use this method, add the following code to your org-mode document:
 
 #+begin_src org
 ,#+begin_src emacs-lisp :exports results :results none
@@ -288,89 +289,88 @@ igo特殊ブロックの出力を変えるためにはorg-modeのエクスポー
 ,#+end_src
 #+end_src
 
-~:exports results~ を指定することでエクスポートのたびにソースブロックを評価させ、 ~:results none~ を指定することで結果の出力を抑制しています。
+Specifying ~:exports results~ causes the source block to be evaluated each time an export is made, and specifying ~:results none~ suppresses the output of the results.
 
-後は通常通りHTMLとしてエクスポートしてください。
+Then export it as HTML as usual.
 
-org-modeのデフォルト設定ではエクスポートするたびにソースブロックを評価するか聞いてくるので yes を入力してください。
+By default, org-mode will ask you whether you want to evaluate the source block every time you export, so enter yes.
 
-するとバッファローカル変数に変換フィルタが設定され、igo特殊ブロックが特別に変換されます。
+This sets a conversion filter in the buffer local variable, which converts the igo special blocks in a special way.
 
-** オプション
-   :PROPERTIES:
-   :CUSTOM_ID: org-export-options
-   :END:
+** Optional
+:PROPERTIES:
+:CUSTOM_ID: org-export-options
+:END:
 
-igo-org-export-html.el を使用して変換する場合、次のオプションが使用できます。
+When converting using igo-org-export-html.el the following options are available:
 
-| オプション                                   | 意味                                                                | デフォルト値                 |
-|----------------------------------------------+---------------------------------------------------------------------+------------------------------|
-| ~#+IGO_JS_PATH:~ /<path-to-directory>/       | スクリプトのあるディレクトリへのパス                                | igo-org-js-pathの値 (./)     |
-| ~#+IGO_JS_TEMPLATE:~ /<header-template>/     | HTMLのHEADに挿入するテキストの雛形(displayがjsのとき)               | igo-org-js-templateの値      |
-| ~#+IGO_LAZY_JS_TEMPLATE:~ /<block-template>/ | igo特殊ブロックの中に挿入するテキストの雛形(displayがlazy-jsのとき) | igo-org-lazy-js-templateの値 |
-| ~#+IGO_HEADER_TEMPLATE:~ /<header-template>/ | HTMLのHEADに挿入するテキストの雛形(displayがcustomのとき)           | igo-org-header-templateの値  |
-| ~#+IGO_BLOCK_TEMPLATE:~ /<block-template>/   | igo特殊ブロックの中に挿入するテキストの雛形(displayがcustomのとき)  | igo-org-block-templateの値   |
-| ~#+IGO_ENABLE:~ /<boolean>/                  | igo特殊ブロックを変換するかどうか                                   | t                            |
-| ~#+IGO_DISPLAY:~ /<display-type>/            | igo特殊ブロックをどのように変換するか                               | js                           |
+| Option                                       | Meaning                                                                       | Default Value                     |
+|----------------------------------------------+-------------------------------------------------------------------------------+-----------------------------------|
+| ~#+IGO_JS_PATH:~ /<path-to-directory>/       | Path to the directory containing the script                                   | Value of igo-org-js-path (./)     |
+| ~#+IGO_JS_TEMPLATE:~ /<header-template>/     | Text template to insert into HTML HEAD (when display is js)                   | Value of igo-org-js-template      |
+| ~#+IGO_LAZY_JS_TEMPLATE:~ /<block-template>/ | Template for text to insert into igo special blocks (when display is lazy-js) | Value of igo-org-lazy-js-template |
+| ~#+IGO_HEADER_TEMPLATE:~ /<header-template>/ | Template of text to insert into HTML HEAD (when display is custom)            | Value of igo-org-header-template  |
+| ~#+IGO_BLOCK_TEMPLATE:~ /<block-template>/   | Template for text to insert into igo special blocks (when display is custom)  | Value of igo-org-block-template   |
+| ~#+IGO_ENABLE:~ /<boolean>/                  | Whether to convert igo special blocks                                         | t                                 |
+| ~#+IGO_DISPLAY:~ /<display-type>/            | How to convert igo special blocks                                             | js                                |
 
-~#+IGO_ENABLE: nil~ を指定するとファイル内で一切の変換を抑制できます。
+You can suppress all conversions in the file by specifying ~#+IGO_ENABLE: nil~.
 
-~#+IGO_DISPLAY:~ には次のいずれかを指定できます。
+~#+IGO_DISPLAY:~ can be one of the following:
 
-| /<display-type>/ | 表示方法                                                                          |
-|------------------+-----------------------------------------------------------------------------------|
-| ~none~           | 非表示                                                                            |
-| ~noconv~         | 変換しない(SGFテキストのまま)                                                     |
-| ~js~             | js_igoによるJavaScript碁盤                                                        |
-| ~lazy-js~        | js_igoによるJavaScript碁盤(遅延読み込み型。<head></head>にスクリプトを挿入しない) |
-| ~svg~            | SVG画像埋め込み                                                                   |
-| ~custom~         | ~#+IGO_HEADER_TEMPLATE:~ と ~#+IGO_BLOCK_TEMPLATE:~ を使用                        |
+| /<display-type>/ | Display method                                                                              |
+|------------------+---------------------------------------------------------------------------------------------|
+| ~none~           | Hidden                                                                                      |
+| ~noconv~         | Do not convert (remain SGF text)                                                            |
+| ~js~             | JavaScript Goboard by js_igo                                                                |
+| ~lazy-js~        | JavaScript Go board by js_igo (lazy loading type, does not insert scripts in <head></head>) |
+| ~svg~            | Embed SVG image                                                                             |
+| ~custom~         | Use ~#+IGO_HEADER_TEMPLATE:~ and ~#+IGO_BLOCK_TEMPLATE:~                                    |
 
-また、表示方法はブロック毎に ~#+begin_igo :display <display-type>~ の形でも指定できます。
+The display method can also be specified for each block in the form ~#+begin_igo :display <display-type>~.
 
-例:
+example:
 
 #+begin_src org
 ,#+IGO_JS_PATH: ./js_igo/
 ,#+IGO_DISPLAY: svg
 
 ,#+begin_igo :move-number t :path A/A/B
-....省略(SVGで表示)....
+....Omitted (SVG view)...
 ,#+end_igo
 
 ,#+begin_igo :read-only t :move-number t :path 5 :display js
-....省略(js_igoで表示)....
+....Omitted (displayed by js_igo)...
 ,#+end_igo
 #+end_src
 
-表示方法によってはテンプレート文字列を指定できます。
+Depending on the display method, you can specify a template string.
 
-オプションの /<header-template>/ の部分は、HTMLのHEAD要素内に挿入するテキストの雛形です。表示方法が js であるブロックが存在する場合、 ~#+IGO_JS_TEMPLATE:~ オプションで指定した雛形が使われます。また、表示方法が custom であるブロックが存在する場合、 ~#+IGO_HEADER_TEMPLATE:~ オプションで指定した雛形も使われます。
+The optional /<header-template>/ is a template for the text to be inserted into the HTML HEAD element. If a block with the display method js exists, the template specified by the ~#+IGO_JS_TEMPLATE:~ option will be used. If a block with the display method custom exists, the template specified by the ~#+IGO_HEADER_TEMPLATE:~ option will also be used.
 
-/<header-template>/ の中では次の記法が使用できます。
+The following syntax can be used within /<header-template>/.
 
-| % /<var-name>/ % | 置き換え先                      |
-|------------------+---------------------------------|
-| ~%PATH%~         | ~#+IGO_JS_PATH:~ オプションの値 |
+| % /<var-name>/ % | Replace with                  |
+|------------------+-------------------------------|
+| ~%PATH%~         | ~#+IGO_JS_PATH:~ option value |
 
-オプションの /<block-template>/ の部分は、igo特殊ブロックの中に挿入するテキストの雛形です。表示方法が lazy-js のブロックには ~#+IGO_LAZY_JS_TEMPLATE:~ オプションで指定した雛形が使われます。また、表示方法が custom であるブロックには ~#+IGO_BLOCK_TEMPLATE:~ オプションで指定した雛形が使われます。
+The optional /<block-template>/ is the template for the text to be inserted into the igo special block. For blocks with lazy-js display style, the template specified by the ~#+IGO_LAZY_JS_TEMPLATE:~ option will be used. For blocks with custom display style, the template specified by the ~#+IGO_BLOCK_TEMPLATE:~ option will be used.
 
-/<header-template>/ の中では次の記法が使用できます。
+The following syntax can be used within /<header-template>/.
 
-| % /<var-name>/ % | 置き換え先                      |
-|------------------+---------------------------------|
-| ~%PATH%~         | ~#+IGO_JS_PATH:~ オプションの値 |
-| ~%SGF%~          | SGFテキスト                     |
-| ~%OPT_JSON%~     | js_igo用のオプション            |
-| ~%SVG%~          | 盤面をSVG化したテキスト         |
+| % /<var-name>/ % | Replace with                  |
+|------------------+-------------------------------|
+| ~%PATH%~         | ~#+IGO_JS_PATH:~ option value |
+| ~%SGF%~          | SGF text                      |
+| ~%OPT_JSON%~     | Options for js_igo            |
+| ~%SVG%~          | SVG version of the board      |
 
-また、%の後に次のいずれかを指定することでテキスト内の一部の文字をエスケープできます。
+You can also escape some characters within the text by specifying one of the following after the %:
 
-| 記法                   | 置き換える文字                 | 置き換え後の文字                  |
-|------------------------+--------------------------------+-----------------------------------|
-| ~%HTML_<var-name>%~    | & < >                          | &amp; &lt; &gt;                   |
-| ~%ATTR_<var-name>%~    | & < > "                        | &amp; &lt; &gt; &quot;            |
-| ~%LITERAL_<var-name>%~ | \ " 改行 <!-- <script </script | \\ \" \n <\!-- <\script <\/script |
+| Notation               | Character to replace                 | Character to replace              |
+|------------------------+--------------------------------------+-----------------------------------|
+| ~%HTML_<var-name>%~    | & < >                                | & < >                             |
+| ~%ATTR_<var-name>%~    | & < > "                              | & < > "                           |
+| ~%LITERAL_<var-name>%~ | \ " line break <!-- <script </script | \\ \" \n <\!-- <\script <\/script |
 
-つまり、HTMLの属性の中に記述するときは%ATTR_を、HTMLの内容部分に記述するときは%HTML_を、JavaScriptの文字列リテラル内に記述するときは%LITERAL_を使用してください。例えばSGFをJavaScriptの文字列にして解析したい場合、 ~parseSGF("%LITERAL_SGF%")~ のように記述します。
-
+In other words, use %ATTR_ when writing inside an HTML attribute, %HTML_ when writing inside the HTML content, and %LITERAL_ when writing inside a JavaScript string literal. For example, if you want to convert an SGF into a JavaScript string and parse it, write it as follows: ~parseSGF("%LITERAL_SGF%")~.
