@@ -20,7 +20,7 @@
 
 ;;; Commentary:
 
-;; 
+;;
 
 ;;; Code:
 
@@ -1130,7 +1130,7 @@
                   ;; compress by gzip
                   (when gzip-p
                     (let ((coding-system-for-read 'no-conversion)
-	                  (coding-system-for-write 'no-conversion))
+                          (coding-system-for-write 'no-conversion))
                       (shell-command-on-region (point-min) (point-max) "gzip" nil t)))
                   ;; convert to base64 data URI
                   (when data-uri-p
@@ -1680,7 +1680,7 @@ turn(igo-game-turn) if illegal move is allowed."
       ;;           (if (null (igo-node-next-nodes node))
       ;;               (save-excursion
       ;;                 (goto-char (igo-node-sgf-end curr-loc))
-      ;;                 (insert 
+      ;;                 (insert
       ;;                  (concat ";" (if (igo-black-p turn) "B" "W") "[" "]"))))
       ;;           )))
 
@@ -1827,7 +1827,7 @@ turn(igo-game-turn) if illegal move is allowed."
 
 (defun igo-editor-set-intersection-setup-at (editor pos istate)
   "Add stone to setup property of current node."
-  (if (not (igo-same-intersection-state-p 
+  (if (not (igo-same-intersection-state-p
             (igo-board-get-at (igo-editor-board editor) pos)
             istate))
       (igo-editor-set-setup-value

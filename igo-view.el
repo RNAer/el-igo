@@ -20,7 +20,7 @@
 
 ;;; Commentary:
 
-;; 
+;;
 
 ;;; Code:
 
@@ -591,14 +591,14 @@ attributes(cx, cy, fx, fy, r, etc...)"
    (apply
     'dom-node
     (if (eq type 'linear)
-	'linearGradient
+        'linearGradient
       'radialGradient)
     `((id . ,id)
       ,@(svg--arguments svg args))
     (mapcar
      (lambda (stop)
        (dom-node 'stop `((offset . ,(format "%s%%" (car stop)))
-			 (stop-color . ,(cdr stop)))))
+                         (stop-color . ,(cdr stop)))))
      stops))))
 
 

@@ -20,7 +20,7 @@
 
 ;;; Commentary:
 
-;; 
+;;
 
 ;;; Code:
 
@@ -136,34 +136,34 @@ between #+begin_igo and #+end_igo."
   ;; The following code is derived from org-fontify-meta-lines-and-blocks-1
   (let ((case-fold-search t))
     (when (re-search-forward
-	   (rx bol (group (zero-or-more (any " \t")) "#"
-			  (group (group (or (seq "+" (one-or-more (any "a-zA-Z")) (optional ":"))
-					    (any " \t")
-					    eol))
-				 (optional (group "_" (group (one-or-more (any "a-zA-Z"))))))
-			  (zero-or-more (any " \t"))
+           (rx bol (group (zero-or-more (any " \t")) "#"
+                          (group (group (or (seq "+" (one-or-more (any "a-zA-Z")) (optional ":"))
+                                            (any " \t")
+                                            eol))
+                                 (optional (group "_" (group (one-or-more (any "a-zA-Z"))))))
+                          (zero-or-more (any " \t"))
                           ;; options
-			  (group (zero-or-more any))))
-	   limit t)
+                          (group (zero-or-more any))))
+           limit t)
       (let ((block-start (match-end 0))  ; includes the \n at end of #+begin line
-	    (block-end nil)              ; will include \n after end of block content
-	    (dc3 (downcase (match-string 3)))
+            (block-end nil)              ; will include \n after end of block content
+            (dc3 (downcase (match-string 3)))
             (options (match-string 6))
-	     block-type)
-	(cond
-	 ((and (match-end 4) (equal dc3 "+begin"))
-	  ;; Truly a block
-	  (setq block-type (downcase (match-string 5)))
-	  (when (re-search-forward
-		 (rx-to-string `(group bol (or (seq (one-or-more "*") space)
-					       (seq (zero-or-more blank)
-						    "#+end"
-						    ,(match-string 4)
-						    word-end
-						    (zero-or-more any)))))
-		 nil t)  ;; on purpose, we look further than LIMIT
-	    ;; We do have a matching #+end line
-	    (setq block-end (match-beginning 0)) ; includes the final newline.
+             block-type)
+        (cond
+         ((and (match-end 4) (equal dc3 "+begin"))
+          ;; Truly a block
+          (setq block-type (downcase (match-string 5)))
+          (when (re-search-forward
+                 (rx-to-string `(group bol (or (seq (one-or-more "*") space)
+                                               (seq (zero-or-more blank)
+                                                    "#+end"
+                                                    ,(match-string 4)
+                                                    word-end
+                                                    (zero-or-more any)))))
+                 nil t)  ;; on purpose, we look further than LIMIT
+            ;; We do have a matching #+end line
+            (setq block-end (match-beginning 0)) ; includes the final newline.
 
             ;;
             ;; Fontify begin_igo block
