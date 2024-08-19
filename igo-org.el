@@ -229,6 +229,40 @@ between #+begin_igo and #+end_igo."
          )))
     editor))
 
+
+(defun igo-org-tangle-special-block (special-block)
+  (let* ((options (igo-org-get-special-block-header-options special-block))
+         (tangle-file (igo-org-opt-value :tangle options))
+         (content (org-element-contents special-block))
+         (paragraph (car content))
+         (sgf-str (buffer-substring-no-properties
+                   (org-element-property :contents-begin paragraph)
+                   (org-element-property :contents-end paragraph))))
+    (if tangle-file
+        (progn (with-temp-file tangle-file
+                 (insert sgf-str))
+               (message "Tangled a IGO block to %s" tangle-file))
+      (message "No tangle file specified for current IGO block"))))
+
+(defun igo-org-tangle-block ()
+  "Tangle the IGO block at point."
+  (interactive)
+  (save-excursion
+    (let ((element (org-element-at-point)))
+      (when (and (eq (org-element-type element) 'special-block)
+                 (string= (org-element-property :type element) "igo"))
+        (igo-org-tangle-special-block element)))))
+
+(defun igo-org-tangle-blocks ()
+  "Tangle all igo blocks in the current buffer."
+  (interactive)
+  (org-element-map (org-element-parse-buffer) 'special-block
+    (lambda (special-block)
+      (when (string= (org-element-property :type special-block) "igo")
+        (igo-org-tangle-special-block special-block))))
+  (message "Tangled all igo blocks"))
+
+
 (defun igo-org-opt-split-path (value)
   (cond
    ((null value) nil)
